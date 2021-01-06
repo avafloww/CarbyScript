@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using CarbyScript.Attributes;
 using CarbyScript.stdlib;
 using CarbyScript.stdlib.Game;
@@ -13,6 +14,8 @@ namespace CarbyScript
 {
     public class Plugin : IDalamudPlugin
     {
+        public V8ScriptEngine Engine => engine;
+        
         private DalamudPluginInterface pluginInterface;
         private PluginCommandManager<Plugin> commandManager;
         private Configuration config;
@@ -21,14 +24,14 @@ namespace CarbyScript
 
         private Console jsConsole;
         private Game jsGame;
-        
+
         public string Name => "CarbyScript";
 
         public void Initialize(DalamudPluginInterface pluginInterface)
         {
             this.pluginInterface = pluginInterface;
 
-            this.config = (Configuration)this.pluginInterface.GetPluginConfig() ?? new Configuration();
+            this.config = (Configuration) this.pluginInterface.GetPluginConfig() ?? new Configuration();
             this.config.Initialize(this.pluginInterface);
 
             this.ui = new PluginUI(this);
@@ -45,18 +48,79 @@ namespace CarbyScript
         {
             return pluginInterface;
         }
-        
+
         public PluginUI GetUI()
         {
             return ui;
         }
-        
+
+        public string LoadScript(string path)
+        {
+            if (!File.Exists(path))
+            {
+                throw new FileNotFoundException($"Failed to load script: '{path}' does not exist");
+            }
+
+            var properPath = string.Empty;
+            if (File.GetAttributes(path).HasFlag(FileAttributes.Directory))
+            {
+                var packageJsonPath = Path.Combine(path, "package.json");
+
+                if (File.Exists(packageJsonPath))
+                {
+                    properPath = Path.Combine(path, ReadPackageDescriptor(packageJsonPath));
+                }
+                else
+                {
+                    throw new FileNotFoundException(
+                        $"Failed to load script: no package.json present in directory '{path}'");
+                }
+            }
+            else
+            {
+                if (path.EndsWith("package.json"))
+                {
+                    properPath = Path.Combine(Directory.GetParent(path).FullName, ReadPackageDescriptor(path));
+                }
+                else if (path.EndsWith(".js"))
+                {
+                    properPath = path;
+                }
+                else
+                {
+                    throw new FileNotFoundException(
+                        $"Failed to load script: '{path}' is not a valid plugin module or script");
+                }
+            }
+
+            return properPath;
+        }
+
+        private string ReadPackageDescriptor(string path)
+        {
+            var desc = PackageDescriptor.Load(path);
+            if (!desc.Type.ToLower().Equals("carbyscript"))
+            {
+                throw new Exception(
+                    $"Failed to load script: '{path}' is not a valid CarbyScript module (package.json 'type' is not 'carbyscript')");
+            }
+
+            if (desc.Main.Equals(string.Empty))
+            {
+                throw new Exception($"Failed to load script: '{path}' has no defined 'main' entry in package.json");
+            }
+
+            return desc.Main;
+        }
+
         private V8ScriptEngine CreateEngine()
         {
             var eng = new V8ScriptEngine();
-            
+
             eng.AddHostObject("console", this.jsConsole);
             eng.AddHostObject("game", this.jsGame);
+
+            eng.DocumentSettings.AccessFlags = DocumentAccessFlags.EnableFileLoading;
             
             return eng;
         }
@@ -75,20 +139,16 @@ namespace CarbyScript
                 }
             }
         }
-        
+
         [Command("/cscript")]
-        [HelpMessage("Opens the CarbyScript window.")]
+        [HelpMessage("Opens the CarbyScript main window.")]
         public void OpenMainWindow(string command, string args)
         {
-            // You may want to assign these references to private variables for convenience.
-            // Keep in mind that the local player does not exist until after logging in.
-            // var chat = this.pluginInterface.Framework.Gui.Chat;
-            // var world = this.pluginInterface.ClientState.LocalPlayer.CurrentWorld.GameData;
-            // this.engine.Execute(args);
             this.ui.IsVisible = !this.ui.IsVisible;
         }
 
         #region IDisposable Support
+
         protected virtual void Dispose(bool disposing)
         {
             if (!disposing) return;
@@ -107,6 +167,7 @@ namespace CarbyScript
             Dispose(true);
             GC.SuppressFinalize(this);
         }
+
         #endregion
     }
 }
