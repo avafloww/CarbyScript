@@ -11,12 +11,12 @@
 
         public void log(string text)
         {
-            this.plugin.GetUI().LogLine($"[info] {text}");
+            this.plugin.GetUI().Repl.LogLine($"[info] {text}");
         }
 
         public void error(string text)
         {
-            this.plugin.GetUI().LogLine($"[err] {text}");
+            this.plugin.GetUI().Repl.LogLine($"[err] {text}");
         }
     }
 }

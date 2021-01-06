@@ -2,7 +2,9 @@
 using CarbyScript.Attributes;
 using CarbyScript.stdlib;
 using CarbyScript.stdlib.Game;
+using Dalamud.Game.ClientState.Structs.JobGauge;
 using Dalamud.Plugin;
+using Lumina.Excel.GeneratedSheets;
 using Microsoft.ClearScript;
 using Microsoft.ClearScript.V8;
 using Console = CarbyScript.stdlib.Console;
